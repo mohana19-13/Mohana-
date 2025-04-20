@@ -1,0 +1,102 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.feature_selection import SelectKBest, f_classif
+
+# 1. Load the Iris dataset
+# You'll typically load this from a file (e.g., iris.csv)
+# For this example, we'll use a common way to load it directly from scikit-learn
+from sklearn.datasets import load_iris
+iris = load_iris()
+data = pd.DataFrame(data=iris.data, columns=iris.feature_names)
+data['target'] = iris.target
+data['species'] = pd.Categorical.from_codes(iris.target, iris.target_names)
+
+# Display the first few rows of the dataset
+print("First few rows of the Iris dataset:")
+print(data.head())
+print("\n")
+
+# 2. Data Preprocessing
+# Separate features (X) and target (y)
+X = data[iris.feature_names]
+y = data['target']
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Scale the features using StandardScaler
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+print("Shape of training features:", X_train_scaled.shape)
+print("Shape of testing features:", X_test_scaled.shape)
+print("\n")
+
+# 3. Feature Selection (Identifying significant features)
+# Use SelectKBest to select the top k features based on ANOVA F-value
+selector = SelectKBest(score_func=f_classif, k='all')
+fit = selector.fit(X_train_scaled, y_train)
+
+# Get the raw F-scores for each feature
+f_scores = fit.scores_
+
+# Get the p-values associated with the F-scores
+p_values = fit.pvalues_
+
+# Create a DataFrame to display feature importance
+feature_importance = pd.DataFrame({
+    'Feature': iris.feature_names,
+    'F-score': f_scores,
+    'P-value': p_values
+})
+
+# Sort features by F-score (higher F-score means more variance between groups)
+feature_importance_sorted = feature_importance.sort_values(by='F-score', ascending=False)
+
+print("Feature Importance:")
+print(feature_importance_sorted)
+print("\n")
+
+# Visualize feature importance
+plt.figure(figsize=(10, 6))
+sns.barplot(x='F-score', y='Feature', data=feature_importance_sorted)
+plt.title('Feature Importance based on ANOVA F-score')
+plt.xlabel('ANOVA F-score')
+plt.ylabel('Feature')
+plt.show()
+
+# Based on the F-scores, 'petal length (cm)' and 'petal width (cm)' appear to be the most significant.
+
+# 4. Model Selection and Training
+# We'll use Logistic Regression as a classification model
+model = LogisticRegression(solver='liblinear', multi_class='ovr', random_state=42)
+model.fit(X_train_scaled, y_train)
+
+# 5. Model Evaluation
+# Make predictions on the test set
+y_pred = model.predict(X_test_scaled)
+
+# Evaluate the model
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy of the Logistic Regression model: {accuracy:.4f}")
+print("\n")
+
+print("Classification Report:")
+print(classification_report(y_test, y_pred, target_names=iris.target_names))
+print("\n")
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+            xticklabels=iris.target_names, yticklabels=iris.target_names)
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.show()
